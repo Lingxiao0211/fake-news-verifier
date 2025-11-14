@@ -2,6 +2,8 @@
 const fetch = require('node-fetch');
 
 exports.handler = async function(event, context) {
+    console.log('verify-news函数被调用，请求方法:', event.httpMethod);
+    
     // 处理CORS
     const headers = {
         'Access-Control-Allow-Origin': '*',
@@ -10,63 +12,66 @@ exports.handler = async function(event, context) {
         'Content-Type': 'application/json'
     };
 
-    // 处理预检请求
     if (event.httpMethod === 'OPTIONS') {
-        return {
-            statusCode: 200,
-            headers,
-            body: ''
-        };
+        return { statusCode: 200, headers, body: '' };
     }
 
     if (event.httpMethod !== 'POST') {
-        return {
-            statusCode: 405,
+        console.log('收到非POST请求:', event.httpMethod);
+        return { 
+            statusCode: 405, 
             headers,
-            body: JSON.stringify({ error: 'Method not allowed' })
+            body: JSON.stringify({ error: 'Method not allowed' }) 
         };
     }
 
     try {
         const { content, source } = JSON.parse(event.body);
+        console.log('收到验证请求，内容长度:', content ? content.length : 0);
+        console.log('信息来源:', source);
         
-        if (!content || !source) {
+        if (!content) {
             return {
                 statusCode: 400,
                 headers,
-                body: JSON.stringify({ error: 'Content and source are required' })
+                body: JSON.stringify({ error: 'Content is required' })
             };
         }
 
-        // 从环境变量获取API密钥
-        const API_KEY = process.env.BAIDU_API_KEY;
-        const APP_ID = process.env.BAIDU_APP_ID;
+        // 使用和grade-essay.js相同的环境变量名
+        const API_KEY = process.env.QIANFAN_API_KEY;
+        const APP_ID = process.env.QIANFAN_APP_ID;
+        
+        console.log('API_KEY 存在:', !!API_KEY);
+        console.log('APP_ID 存在:', !!APP_ID);
         
         if (!API_KEY || !APP_ID) {
-            throw new Error('API credentials not configured');
+            console.error('环境变量缺失:', { hasApiKey: !!API_KEY, hasAppId: !!APP_ID });
+            return {
+                statusCode: 500,
+                headers,
+                body: JSON.stringify({ 
+                    error: 'Server configuration error',
+                    details: {
+                        hasApiKey: !!API_KEY,
+                        hasAppId: !!APP_ID
+                    }
+                })
+            };
         }
 
-        // 构建SIFT分析提示词 - 英文
         const prompt = `You are a professional fake news verification expert. Please analyze the following information using the SIFT four-step verification method:
 
 Information: "${content}"
 Source: "${source}"
 
-Please respond in English with the following structure, providing detailed analysis for each step:
-
-1. [Stop Analysis] Explain why we need to stop and carefully verify this information, pointing out suspicious elements.
-2. [Source Investigation] Analyze the credibility of this information source, including publisher background, history, etc.
-3. [Coverage Search] Suggest how to find relevant reports from other reliable media, indicate if there is multi-source verification.
-4. [Claim Tracing] Analyze how to track original statements and evidence, check if information has been distorted.
-5. [Credibility Rating] Provide final credibility rating (Highly Credible/Generally Credible/Needs Caution/Potentially Misleading/Suspected Fake/Confirmed Fake/Unable to Determine)
-6. [Final Advice] Provide clear handling recommendations.
-7. [Learning Points] Summarize verification techniques learned from this case.
-
-Please respond in JSON format with the following fields:
+Please respond in English with JSON format containing these fields:
 - sift_analysis: {stop, investigate_source, find_coverage, trace_claims}
 - credibility_rating: string
 - final_advice: string  
-- learning_tips: string`;
+- learning_tips: string
+
+Make the analysis detailed and educational.`;
 
         const requestBody = {
             messages: [
@@ -75,48 +80,55 @@ Please respond in JSON format with the following fields:
                     content: prompt
                 }
             ],
-            temperature: 0.3,  // 降低随机性，使回复更一致
+            temperature: 0.3,
             max_tokens: 2000
         };
 
-        console.log('Preparing to call Qianfan API...');
+        console.log('准备调用千帆API...');
         
+        // 使用和grade-essay.js完全相同的API调用方式
         const response = await fetch('https://qianfan.baidubce.com/v2/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${API_KEY}`,
-                'X-Appid': APP_ID
+                'Authorization': API_KEY,  // 直接使用API_KEY，不加Bearer
+                'appid': APP_ID
             },
             body: JSON.stringify(requestBody)
         });
-
+        
+        console.log('千帆API响应状态:', response.status);
+        
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('API response error:', response.status, errorText);
-            throw new Error(`API request failed with status ${response.status}`);
+            console.error('千帆API错误详情:', {
+                status: response.status,
+                statusText: response.statusText,
+                errorText: errorText
+            });
+            throw new Error(`API error: ${response.status} - ${response.statusText}`);
         }
-
-        const data = await response.json();
         
-        // 解析AI的回复
+        const data = await response.json();
+        console.log('千帆API成功响应');
+        
+        // 解析AI回复
         let aiResponse;
         try {
-            // 尝试从AI回复中提取JSON
-            const content = data.choices[0].message.content;
-            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            const aiContent = data.choices[0].message.content;
+            console.log('AI回复内容:', aiContent);
+            
+            const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 aiResponse = JSON.parse(jsonMatch[0]);
             } else {
-                // 如果无法解析为JSON，使用默认回复
-                aiResponse = createDefaultResponse(content, source);
+                aiResponse = createDefaultResponse(aiContent, source);
             }
         } catch (parseError) {
-            console.error('Failed to parse AI response:', parseError);
+            console.error('解析AI回复失败:', parseError);
             aiResponse = createDefaultResponse(data.choices[0].message.content, source);
         }
 
-        // 添加原始内容到响应中
         aiResponse.content = content;
         aiResponse.source = source;
 
@@ -125,31 +137,30 @@ Please respond in JSON format with the following fields:
             headers,
             body: JSON.stringify(aiResponse)
         };
-
+        
     } catch (error) {
-        console.error('Function error:', error);
+        console.error('函数执行错误:', error);
         return {
             statusCode: 500,
             headers,
             body: JSON.stringify({ 
-                error: 'Internal server error',
-                message: error.message 
+                error: `Processing error: ${error.message}`,
+                stack: error.stack
             })
         };
     }
 };
 
-// 创建默认响应的备用函数 - 英文
 function createDefaultResponse(aiContent, source) {
     return {
         sift_analysis: {
-            stop: "Based on AI analysis, this information contains multiple elements that require verification. It is recommended to stop sharing and conduct further verification.",
-            investigate_source: `The credibility and background of "${source}" need further investigation.`,
-            find_coverage: "It is recommended to search for relevant reports through authoritative news media and official channels for comparative verification.",
-            trace_claims: "Need to track the original source of the information and check if it has been modified or distorted."
+            stop: "Based on AI analysis, this information contains multiple elements that require verification.",
+            investigate_source: `The credibility of "${source}" needs further investigation.`,
+            find_coverage: "Search for relevant reports through authoritative news media.",
+            trace_claims: "Track the original source to check for modifications."
         },
         credibility_rating: "Needs Caution",
-        final_advice: "Do not easily believe or share this information. It is recommended to verify through multiple reliable channels.",
-        learning_tips: "When encountering suspicious information, first stop and think, then verify from multiple perspectives."
+        final_advice: "Verify through multiple reliable channels before sharing.",
+        learning_tips: "Always stop and verify suspicious information from multiple sources."
     };
 }
