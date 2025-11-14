@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fake News Verifier - SIFT Method</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Fake News Verifier</h1>
+            <p class="subtitle">Analyze suspicious information using the SIFT Verification Method</p>
+        </header>
+
+        <div class="info-box">
+            <h3>📚 About SIFT Method</h3>
+            <div class="sift-steps">
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <strong>Stop</strong> - Pause and don't share immediately
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <strong>Investigate the Source</strong> - Check the credibility of the information source
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <strong>Find Better Coverage</strong> - Look for reliable media coverage
+                </div>
+                <div class="step">
+                    <span class="step-number">4</span>
+                    <strong>Trace Claims</strong> - Track original sources and evidence
+                </div>
+            </div>
+        </div>
+
+        <div class="input-section">
+            <h3>Share Suspicious Information You've Encountered</h3>
+            <textarea 
+                id="suspiciousContent" 
+                placeholder="Paste information you've seen on social media, WeChat groups, news websites, etc. here... (supports text, links, or screenshot descriptions)"
+                rows="5"
+            ></textarea>
+            <div class="source-input">
+                <input 
+                    type="text" 
+                    id="contentSource" 
+                    placeholder="Information source (e.g., Weibo, WeChat group, news website, etc.)"
+                >
+            </div>
+            <button id="analyzeBtn" class="analyze-btn">
+                🔍 Analyze with SIFT Method
+            </button>
+        </div>
+
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>AI is analyzing using SIFT method...</p>
+        </div>
+
+        <div id="resultSection" class="result-section hidden">
+            <h3>📊 AI Verification Report</h3>
+            <div id="verificationResult" class="verification-result">
+                <!-- AI分析结果将显示在这里 -->
+            </div>
+        </div>
+
+        <div class="examples">
+            <h4>💡 Example Suspicious Information:</h4>
+            <div class="example-items">
+                <div class="example" onclick="fillExample(1)">
+                    "Famous celebrity suddenly announces retirement from entertainment industry, reasons shock everyone!"
+                </div>
+                <div class="example" onclick="fillExample(2)">
+                    "Government to release new regulation requiring all elderly to re-certify pensions"
+                </div>
+                <div class="example" onclick="fillExample(3)">
+                    "Scientists discover certain food can cure cancer completely"
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
